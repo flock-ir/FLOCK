@@ -1,5 +1,7 @@
 # Flock
 
+**Framework for Linked Operations, Cases & Knowledge**
+
 A visually-driven security incident management platform for CSIRTs.
 
 ## v0.2 baseline
