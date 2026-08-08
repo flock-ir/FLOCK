@@ -4,6 +4,8 @@
 
 Flock is a Cloudflare-native security incident management platform for CSIRTs. The application, API, database and evidence storage all run on Cloudflare.
 
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/flock-ir/flock)
+
 ## Architecture
 
 - **Cloudflare Worker** — API and application runtime
@@ -16,7 +18,7 @@ The runtime has no external database or application server dependency.
 
 ## Deploy from GitHub to Cloudflare
 
-This repository is configured as a Cloudflare Workers application. Import the repository from **Workers & Pages → Create → Import a repository** and select `flock-ir/flock`.
+Click the **Deploy to Cloudflare** button above to start deployment directly from GitHub.
 
 Cloudflare should detect the project configuration from `wrangler.jsonc`. Use the repository root as the root directory.
 
