@@ -2,51 +2,108 @@
 
 **Framework for Linked Operations, Cases & Knowledge**
 
-A visually-driven security incident management platform for CSIRTs.
+Flock is a Cloudflare-native security incident management platform for CSIRTs. The application, API, database and evidence storage all run on Cloudflare.
 
-## v0.2 baseline
+## Architecture
 
-- Cyber incident lifecycle: New → Triage → Investigation → Containment → Eradication → Recovery → Monitoring → Post Incident Review → Closed.
-- Bidirectional phase movement from either the incident workspace or drag-and-drop workflow board.
-- Every phase transition creates an audit event with actor, timestamp, previous phase, new phase and reason.
-- Neutral two-word incident call signs (for example `purple-flock`) that do not encode severity, threat type, customer, region or classification.
-- Phase-specific guidance/checklists.
-- PR3TACK context placeholder ready for API integration.
-- Browser persistence for prototype data; Worker/D1 persistence is the next backend milestone.
+- **Cloudflare Worker** — API and application runtime
+- **Workers Static Assets** — React/Vite frontend
+- **Cloudflare D1** — incidents, phase tasks, audit history and evidence metadata
+- **Cloudflare R2** — incident evidence and file objects
+- **Cloudflare Access** — optional identity protection for production deployments
 
-## Local development
+The runtime has no external database or application server dependency.
+
+## Deploy from GitHub to Cloudflare
+
+This repository is configured as a Cloudflare Workers application. Import the repository from **Workers & Pages → Create → Import a repository** and select `flock-ir/flock`.
+
+Cloudflare should detect the project configuration from `wrangler.jsonc`. Use the repository root as the root directory.
+
+Recommended build/deploy settings:
+
+- Build command: `npm run build`
+- Deploy command: `npm run deploy`
+- Production branch: `main`
+
+The deployment uses Wrangler automatic provisioning. On the first deployment Cloudflare will create and bind the required D1 database and R2 bucket. The deploy script then applies the D1 migrations.
+
+No API keys or application secrets are required for the baseline deployment.
+
+## One-command deployment
+
+With Node.js and Wrangler authentication available:
 
 ```bash
 npm install
+npx wrangler login
+npm run deploy
+```
+
+The deploy script builds the React application, deploys the Worker/static assets, provisions the Cloudflare bindings when required, and applies D1 migrations.
+
+## Local development
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Apply the local D1 schema:
+
+```bash
+npm run db:migrate:local
+```
+
+Start the Worker and frontend locally:
+
+```bash
 npm run dev
 ```
 
-## Build
+## Persistence model
 
-```bash
-npm run build
-```
+The application bootstraps incident state from `/api/incidents` before loading the existing React UI. The UI's existing browser persistence is transparently synchronised back to D1 through the Worker API, so the v0.2 interface remains intact while Cloudflare becomes the source of truth.
 
-Vite outputs the production site to `dist/`.
+If the D1 database is empty on first launch, the existing baseline incidents are written to D1 automatically when the UI performs its first state save. If the Cloudflare API backend cannot be reached during development, the UI continues to operate using browser storage.
 
-## Cloudflare Pages from GitHub
+Audit events are append-only at the API layer: existing audit rows are never updated or deleted by normal incident synchronisation.
 
-Connect the GitHub repository to Cloudflare Pages and use:
+## Evidence storage
 
-- Framework preset: **Vite**
-- Build command: `npm run build`
-- Build output directory: `dist`
-- Node.js: current LTS
+R2-backed evidence endpoints are available now for the next UI milestone:
 
-No secrets are required for this frontend baseline.
+- `GET /api/incidents/:incidentId/evidence`
+- `POST /api/incidents/:incidentId/evidence`
+- `GET /api/evidence/:evidenceId`
 
-## Next architecture milestone
+Uploads use the request body as the evidence object and accept the original filename through the `X-Filename` header. Evidence metadata is recorded in D1 and the object itself is stored in R2.
 
-The frontend is intended to move from browser storage to:
+## Authentication
 
-- Cloudflare Worker API
-- Cloudflare D1 for incidents, tasks, audit and configuration
-- Cloudflare R2 for evidence/files
-- Cloudflare Access or organisation SSO for responder identity
+The Worker recognises Cloudflare Access identity through the `Cf-Access-Authenticated-User-Email` header and records that identity for evidence uploads. The baseline can be deployed without Access for testing.
 
-Audit events should become append-only server-side records once the Worker/D1 layer is added.
+Before production use, place the Flock hostname behind **Cloudflare Access** and restrict it to your responder population. This keeps authentication entirely within Cloudflare while allowing the application to remain independent of a custom identity provider.
+
+## API
+
+- `GET /api/health` — Worker, D1 and R2 health
+- `GET /api/session` — current Cloudflare Access identity, when present
+- `GET /api/incidents` — retrieve incidents with tasks and audit history
+- `PUT /api/incidents` — synchronise incident records
+- `PUT /api/incidents/:id` — update one incident
+
+## Incident lifecycle
+
+Flock currently uses:
+
+`New → Triage → Investigation → Containment → Eradication → Recovery → Monitoring → Post Incident Review → Closed`
+
+Phase movement is bidirectional. Each transition creates an audit event containing actor, timestamp, prior phase, new phase and reason.
+
+## Current release
+
+**v0.3 — Cloudflare-native baseline**
+
+This release converts the v0.2 browser prototype into a single Cloudflare application while retaining the existing incident workflow UI.
